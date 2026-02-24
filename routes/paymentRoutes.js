@@ -72,6 +72,9 @@ router.post("/verify-payment", async (req, res) => {
     if (!slot) {
       return res.status(400).json({ message: "Slot already booked" });
     }
+    if (!name || !email || !phone) {
+        return res.status(400).json({ message: "Customer details missing" });
+    }
 
     // Create booking only after payment verified
     const booking = await Booking.create({
