@@ -55,6 +55,13 @@ router.post("/verify-payment", async (req, res) => {
       imageUrl
     } = req.body;
 
+console.log("---- VERIFY REQUEST RECEIVED ----");
+console.log("Date:", date);
+console.log("Time:", time);
+console.log("Name:", name);
+console.log("Email:", email);
+console.log("Phone:", phone);
+    
     // Generate expected signature
     const body = razorpay_order_id + "|" + razorpay_payment_id;
 
@@ -69,6 +76,7 @@ router.post("/verify-payment", async (req, res) => {
 
     // Double-check slot availability (security check)
     const slot = await Slot.findOne({ date, time, isBooked: false });
+    console.log("Slot found:", slot);
 
     if (!slot) {
       return res.status(400).json({ message: "Slot already booked" });
@@ -94,31 +102,38 @@ router.post("/verify-payment", async (req, res) => {
     slot.isBooked = true;
     await slot.save();
 
-    await transporter.sendMail({
-  from: `"Artistry" <${process.env.EMAIL_USER}>`,
-  to: email,
-  subject: "Your Portrait Booking is Confirmed 🎨",
-  html: `
-    <div style="font-family: Arial; padding: 20px;">
-      <h2>Booking Confirmed 🎉</h2>
-      <p>Hi ${name},</p>
+  try {
+      await transporter.sendMail({
+      from: `"Artistry" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Your Portrait Booking is Confirmed 🎨",
+      html: `
+        <div style="font-family: Arial; padding: 20px;">
+          <h2>Booking Confirmed 🎉</h2>
+          <p>Hi ${name},</p>
+    
+          <p>Your portrait booking has been successfully confirmed.</p>
+    
+          <h3>Booking Details:</h3>
+          <ul>
+            <li><strong>Order ID:</strong> ${booking._id}</li>
+            <li><strong>Date:</strong> ${date}</li>
+            <li><strong>Time:</strong> ${time}</li>
+            <li><strong>Amount Paid:</strong> ₹${amount}</li>
+          </ul>
+    
+          <p>You can use your Order ID to track your booking anytime.</p>
+    
+          <p>Thank you for choosing Artistry 🎨</p>
+        </div>
+      `,
+    });
+console.log("Email sent successfully");
+} catch (mailError) {
+  console.log("Email sending failed:", mailError);
+}
 
-      <p>Your portrait booking has been successfully confirmed.</p>
-
-      <h3>Booking Details:</h3>
-      <ul>
-        <li><strong>Order ID:</strong> ${booking._id}</li>
-        <li><strong>Date:</strong> ${date}</li>
-        <li><strong>Time:</strong> ${time}</li>
-        <li><strong>Amount Paid:</strong> ₹${amount}</li>
-      </ul>
-
-      <p>You can use your Order ID to track your booking anytime.</p>
-
-      <p>Thank you for choosing Artistry 🎨</p>
-    </div>
-  `,
-});
+    
 
     res.json({
       message: "Payment verified & booking confirmed",
