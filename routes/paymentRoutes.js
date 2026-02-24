@@ -20,9 +20,7 @@ router.post("/create-order", async (req, res) => {
     if (!slot) {
       return res.status(400).json({ message: "Slot not available" });
     }
-    if (!name || !email || !phone) {
-        return res.status(400).json({ message: "Customer details missing" });
-    }
+
 
     const options = {
       amount: amount * 100, // in paise
