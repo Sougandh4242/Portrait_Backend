@@ -3,7 +3,7 @@ const router = express.Router();
 const Slot = require("../models/Slot");
 
 // Predefined time slots
-const predefinedSlots = ["10:00 AM", "2:00 PM", "5:00 PM"];
+const predefinedSlots = ["9:00 AM","10:00 AM","11:00 AM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM"];
 
 // Create slots for a date
 router.post("/create-slots", async (req, res) => {
