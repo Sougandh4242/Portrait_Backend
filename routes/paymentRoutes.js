@@ -7,6 +7,14 @@ const crypto = require("crypto");
 const Slot = require("../models/Slot");
 const Booking = require("../models/Booking");
 
+const Brevo = require("brevo");
+const brevoClient = Brevo.default;
+const client = brevoClient.ApiClient.instance;
+
+// Configure API key
+client.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;
+const apiInstance = new brevoClient.TransactionalEmailsApi();
+
 // ----------------------
 // Create Razorpay Order
 // ----------------------
@@ -102,6 +110,43 @@ console.log("Phone:", phone);
     slot.isBooked = true;
     await slot.save();
 
+    //brevo email notification
+    try {
+      await apiInstance.sendTransacEmail({
+        sender: {
+          email: process.env.BREVO_FROM_EMAIL,
+          name: process.env.BREVO_FROM_NAME,
+        },
+        to: [
+          {
+            email: email,
+            name: name,
+          },
+        ],
+        subject: "Your Portrait Booking is Confirmed 🎨",
+        htmlContent: `
+          <div style="font-family: Arial; padding: 20px;">
+            <h2>🎉 Booking Confirmed!</h2>
+            <p>Hi ${name},</p>
+            <p>Your portrait booking is successfully confirmed.</p>
+            <h3>Details:</h3>
+            <ul>
+              <li><strong>Order ID:</strong> ${booking._id}</li>
+              <li><strong>Date:</strong> ${date}</li>
+              <li><strong>Time:</strong> ${time}</li>
+              <li><strong>Amount:</strong> ₹${amount}</li>
+            </ul>
+            <p>Thank you for choosing Artistry 🎨</p>
+          </div>
+        `,
+      });
+
+      console.log("Brevo email sent!");
+    } catch (mailError) {
+      console.error("Brevo email failed:", mailError);
+    }
+/*  
+
   try {
       await transporter.sendMail({
       from: `"Artistry" <${process.env.EMAIL_USER}>`,
@@ -132,7 +177,7 @@ console.log("Email sent successfully");
 } catch (mailError) {
   console.log("Email sending failed:", mailError);
 }
-
+*/
     
 
     res.json({
