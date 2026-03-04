@@ -21,7 +21,6 @@ const siteContentRoutes = require("./routes/siteContentRoutes");
 connectDB();
 
 const app = express();
-
 // CORS (IMPORTANT for JWT cookies)
 app.use(cors({
   origin: process.env.FRONTEND_URL, 
