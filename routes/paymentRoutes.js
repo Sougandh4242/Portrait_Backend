@@ -6,6 +6,7 @@ const crypto = require("crypto");
 
 const Slot = require("../models/Slot");
 const Booking = require("../models/Booking");
+const FRONTEND_URL = process.env.FRONTEND_URL;
 
 //brevo email setup
 
@@ -189,7 +190,7 @@ try {
 
               <!-- Track Button -->
               <div style="text-align: center; margin: 30px 0;">
-                <a href="http://localhost:8080/track/${booking._id}"
+                <a href="${FRONTEND_URL}/track/${booking._id}"
                   style="background-color: #c9a227; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-size: 14px; font-weight: bold;">
                   Track Your Order
                 </a>
