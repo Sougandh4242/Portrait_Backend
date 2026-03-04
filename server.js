@@ -1,46 +1,55 @@
-require("dotenv").config(); 
+require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 
 const connectDB = require("./config/db");
 const slotRoutes = require("./routes/slotRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
-//test route for email
-const testRoutes = require("./routes/testRoutes");
+//admin routes
+const adminRoutes = require("./routes/adminRoutes");
+//gallery routes
+const galleryRoutes = require("./routes/galleryRoutes");
+//contact routes
+const contactRoutes = require("./routes/contactRoutes");
+//site content routes
+const siteContentRoutes = require("./routes/siteContentRoutes");
 
-
-// Load environment variables
-console.log(process.env.CLOUDINARY_API_KEY);
-
-// Connect to MongoDB
 connectDB();
 
 const app = express();
 
-// Middleware
+// CORS (IMPORTANT for JWT cookies)
 app.use(cors({
-  origin: "*", // temporary - allow all
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  origin: process.env.FRONTEND_URL, 
+  credentials: true
 }));
+
 app.use(express.json());
+app.use(cookieParser());
+
+// Public routes
 app.use("/api/slots", slotRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/bookings", bookingRoutes);
-//test route for email
-app.use("/api/test", testRoutes);
+// Gallery routes
+app.use("/api/gallery", galleryRoutes);
 
-// Test Route
+// Admin routes
+app.use("/api/admin", adminRoutes);
+
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
+app.use("/api/contact", contactRoutes);
+app.use("/api/site-content", siteContentRoutes);
 
-// Start server
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  // console.log(`Server running on port ${PORT}`);
 });

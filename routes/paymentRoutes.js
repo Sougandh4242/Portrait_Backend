@@ -1,4 +1,4 @@
-const transporter = require("../config/mailer");
+// const transporter = require("../config/mailer");
 const express = require("express");
 const router = express.Router();
 const razorpay = require("../config/razorpay");
@@ -7,13 +7,9 @@ const crypto = require("crypto");
 const Slot = require("../models/Slot");
 const Booking = require("../models/Booking");
 
-const Brevo = require("brevo");
-const brevoClient = Brevo.default;
-const client = brevoClient.ApiClient.instance;
+//brevo email setup
 
-// Configure API key
-client.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;
-const apiInstance = new brevoClient.TransactionalEmailsApi();
+//----------------------------------------------
 
 // ----------------------
 // Create Razorpay Order
@@ -60,15 +56,16 @@ router.post("/verify-payment", async (req, res) => {
       date,
       time,
       amount,
-      imageUrl
+      imageUrl,
+      address
     } = req.body;
 
-console.log("---- VERIFY REQUEST RECEIVED ----");
-console.log("Date:", date);
-console.log("Time:", time);
-console.log("Name:", name);
-console.log("Email:", email);
-console.log("Phone:", phone);
+// console.log("---- VERIFY REQUEST RECEIVED ----");
+// console.log("Time:", time);
+// console.log("Date:", date);
+// console.log("Name:", name);
+// console.log("Email:", email);
+// console.log("Phone:", phone);
     
     // Generate expected signature
     const body = razorpay_order_id + "|" + razorpay_payment_id;
@@ -78,18 +75,26 @@ console.log("Phone:", phone);
       .update(body.toString())
       .digest("hex");
 
+      //for testing locally comment out signature verification
     if (expectedSignature !== razorpay_signature) {
       return res.status(400).json({ message: "Payment verification failed" });
     }
 
     // Double-check slot availability (security check)
     const slot = await Slot.findOne({ date, time, isBooked: false });
-    console.log("Slot found:", slot);
+    // console.log("Slot found:", slot);
+
+    //block dates check
+    if (slot.isBlocked) {
+      return res.status(400).json({ message: "Slot blocked by admin" });
+    }
+
 
     if (!slot) {
       return res.status(400).json({ message: "Slot already booked" });
     }
-    if (!name || !email || !phone) {
+    
+    if (!name || !email || !phone || !address) {
         return res.status(400).json({ message: "Customer details missing" });
     }
 
@@ -104,6 +109,7 @@ console.log("Phone:", phone);
       amount,
       paymentStatus: "paid",
       orderStatus: "pending",
+      address,
     });
 
     // Lock slot
@@ -111,74 +117,165 @@ console.log("Phone:", phone);
     await slot.save();
 
     //brevo email notification
-    try {
-      await apiInstance.sendTransacEmail({
-        sender: {
-          email: process.env.BREVO_FROM_EMAIL,
-          name: process.env.BREVO_FROM_NAME,
+    // console.log("🚀 About to send email...");
+
+try {
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "api-key": process.env.BREVO_API_KEY,
+    },
+    body: JSON.stringify({
+      sender: {
+        name: "Artistry",
+        email: process.env.BREVO_FROM_EMAIL,
+      },
+      to: [
+        {
+          email: email,
+          name: name,
         },
-        to: [
-          {
-            email: email,
-            name: name,
-          },
-        ],
-        subject: "Your Portrait Booking is Confirmed 🎨",
-        htmlContent: `
-          <div style="font-family: Arial; padding: 20px;">
-            <h2>🎉 Booking Confirmed!</h2>
-            <p>Hi ${name},</p>
-            <p>Your portrait booking is successfully confirmed.</p>
-            <h3>Details:</h3>
-            <ul>
-              <li><strong>Order ID:</strong> ${booking._id}</li>
-              <li><strong>Date:</strong> ${date}</li>
-              <li><strong>Time:</strong> ${time}</li>
-              <li><strong>Amount:</strong> ₹${amount}</li>
-            </ul>
-            <p>Thank you for choosing Artistry 🎨</p>
+      ],
+      subject: "Your Portrait Booking is Confirmed ",
+      htmlContent: `
+        <div style="font-family: Arial, sans-serif; background-color: #f4f6f8; padding: 40px 20px;">
+          <div style="max-width: 620px; margin: auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,0.08);">
+            
+            <!-- Header -->
+            <div style="background-color: #1a1a1a; padding: 20px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 22px;">Artistry </h1>
+              <p style="color: #cccccc; margin: 5px 0 0; font-size: 13px;">
+                Professional Portrait Services
+              </p>
+            </div>
+
+            <!-- Body -->
+            <div style="padding: 30px;">
+              <h2 style="color: #2e7d32; margin-top: 0;">🎉 Booking Confirmed</h2>
+
+              <p style="font-size: 15px; color: #333;">
+                Dear <strong>${name}</strong>,
+              </p>
+
+              <p style="font-size: 14px; color: #555; line-height: 1.6;">
+                Thank you for choosing <strong>Artistry</strong>.  
+                Your portrait booking has been successfully confirmed.  
+                We are excited to create something beautiful for you.
+              </p>
+
+              <hr style="margin: 25px 0; border: none; border-top: 1px solid #eee;" />
+
+              <h3 style="margin-bottom: 15px; color: #444;">Booking Details</h3>
+
+              <table style="width: 100%; font-size: 14px; color: #555;">
+                <tr>
+                  <td style="padding: 8px 0;"><strong>Order ID:</strong></td>
+                  <td>${booking._id}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0;"><strong>Date:</strong></td>
+                  <td>${date}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0;"><strong>Time:</strong></td>
+                  <td>${time}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0;"><strong>Amount Paid:</strong></td>
+                  <td>₹${amount}</td>
+                </tr>
+              </table>
+
+              <!-- Track Button -->
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="http://localhost:8080/track/${booking._id}"
+                  style="background-color: #c9a227; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-size: 14px; font-weight: bold;">
+                  Track Your Order
+                </a>
+              </div>
+
+              <p style="font-size: 14px; color: #555; line-height: 1.6;">
+                If you have any questions, feel free to contact our support team at 
+                <strong>support@artistry.com</strong>.
+              </p>
+
+              <p style="font-size: 12px; color: #888; margin-top: 25px;">
+                Please do not reply to this email. This is a system-generated message.
+              </p>
+
+              <p style="margin-top: 20px; font-size: 14px; color: #333;">
+                Warm regards,<br/>
+                <strong>Team Artistry </strong>
+              </p>
+            </div>
+
+            <!-- Footer -->
+            <div style="background-color: #fafafa; padding: 15px; text-align: center; font-size: 12px; color: #999;">
+              © ${new Date().getFullYear()} Artistry. All rights reserved.
+            </div>
+
           </div>
-        `,
-      });
-
-      console.log("Brevo email sent!");
-    } catch (mailError) {
-      console.error("Brevo email failed:", mailError);
-    }
-/*  
-
-  try {
-      await transporter.sendMail({
-      from: `"Artistry" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Your Portrait Booking is Confirmed 🎨",
-      html: `
-        <div style="font-family: Arial; padding: 20px;">
-          <h2>Booking Confirmed 🎉</h2>
-          <p>Hi ${name},</p>
-    
-          <p>Your portrait booking has been successfully confirmed.</p>
-    
-          <h3>Booking Details:</h3>
-          <ul>
-            <li><strong>Order ID:</strong> ${booking._id}</li>
-            <li><strong>Date:</strong> ${date}</li>
-            <li><strong>Time:</strong> ${time}</li>
-            <li><strong>Amount Paid:</strong> ₹${amount}</li>
-          </ul>
-    
-          <p>You can use your Order ID to track your booking anytime.</p>
-    
-          <p>Thank you for choosing Artistry 🎨</p>
         </div>
+        `
+    }),
+  });
+
+  // console.log("Brevo status:", response.status);
+
+  // ---------------------
+// Notify Artist
+// ---------------------
+
+try {
+  await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "api-key": process.env.BREVO_API_KEY,
+    },
+    body: JSON.stringify({
+      sender: {
+        name: "Artistry System",
+        email: process.env.BREVO_FROM_EMAIL,
+      },
+      to: [
+        {
+          email: process.env.ARTIST_EMAIL,   // <-- we add this in .env
+          name: "Artist",
+        },
+      ],
+      subject: "🔔 New Portrait Booking Received",
+      htmlContent: `
+        <h2>New Booking Alert</h2>
+        <p><strong>Order ID:</strong> ${booking._id}</p>
+        <p><strong>Customer:</strong> ${name}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Phone:</strong> ${phone}</p>
+        <p><strong>Date:</strong> ${date}</p>
+        <p><strong>Time:</strong> ${time}</p>
+        <p><strong>Amount:</strong> ₹${amount}</p>
       `,
-    });
-console.log("Email sent successfully");
-} catch (mailError) {
-  console.log("Email sending failed:", mailError);
+    }),
+  });
+
+  // console.log("✅ Artist notification sent");
+
+} catch (err) {
+  // console.log("❌ Artist notification failed:", err);
 }
-*/
-    
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    // console.log("Brevo error:", errorText);
+  } else {
+    // console.log("✅ Email successfully accepted by Brevo");
+  }
+
+} catch (mailError) {
+  // console.log("Brevo email failed:", mailError);
+}
+
 
     res.json({
       message: "Payment verified & booking confirmed",
@@ -186,6 +283,7 @@ console.log("Email sent successfully");
     });
 
   } catch (error) {
+    // console.log("Hitting Catch Block:", error);
     res.status(500).json({ error: error.message });
   }
 });

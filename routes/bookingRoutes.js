@@ -1,28 +1,32 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const router = express.Router();
 const Booking = require("../models/Booking");
 
-// Track Order
-router.post("/track", async (req, res) => {
+// Track Order by Order ID
+router.get("/track/:orderId", async (req, res) => {
   try {
-    const { email, orderId } = req.body;
+    const { orderId } = req.params;
 
-    if (!email || !orderId) {
-      return res.status(400).json({ message: "Email and Order ID are required" });
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ message: "Invalid Order ID format" });
     }
 
-    const booking = await Booking.findOne({
-      _id: orderId,
-      email: email
-    });
+    const booking = await Booking.findById(orderId);
 
     if (!booking) {
       return res.status(404).json({ message: "Order not found" });
     }
 
     res.json({
-      message: "Order found",
-      booking
+      orderId: booking._id,
+      name: booking.name,
+      date: booking.date,
+      time: booking.time,
+      orderStatus: booking.orderStatus,
+      paymentStatus: booking.paymentStatus,
+      amount: booking.amount
     });
 
   } catch (error) {

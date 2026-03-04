@@ -39,6 +39,15 @@ const bookingSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  address: {
+  line1: { type: String, required: true },
+  city: { type: String, required: true },
+  state: { type: String, required: true },
+  pincode: { type: String, required: true },
+  country: { type: String, required: true },
+  latitude: Number,
+  longitude: Number,
+},
 }, { timestamps: true });
 
 module.exports = mongoose.model("Booking", bookingSchema);
