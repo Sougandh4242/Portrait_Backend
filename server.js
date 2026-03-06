@@ -21,11 +21,26 @@ const siteContentRoutes = require("./routes/siteContentRoutes");
 connectDB();
 
 const app = express();
+
 // CORS (IMPORTANT for JWT cookies)
 app.use(cors({
   origin: process.env.FRONTEND_URL, 
   credentials: true
 }));
+
+//------------------
+// Health check endpoint
+//------------------
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    uptime: process.uptime(),
+    message: "Server running",
+    timestamp: Date.now()
+  });
+});
+
+//-----------------
 
 app.use(express.json());
 app.use(cookieParser());
