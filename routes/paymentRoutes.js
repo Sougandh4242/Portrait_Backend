@@ -4,33 +4,43 @@ const router = express.Router();
 const razorpay = require("../config/razorpay");
 const crypto = require("crypto");
 
-const Slot = require("../models/Slot");
 const Booking = require("../models/Booking");
+const BlockedDate = require("../models/BlockedDate");
+const SiteConfig = require("../models/SiteConfig");
+
 const FRONTEND_URL = process.env.FRONTEND_URL;
 
-//brevo email setup
-
-//----------------------------------------------
 
 // ----------------------
 // Create Razorpay Order
 // ----------------------
 router.post("/create-order", async (req, res) => {
   try {
-    const { amount, date, time } = req.body;
 
-    // Check slot availability
-    const slot = await Slot.findOne({ date, time, isBooked: false });
+    const { amount, date } = req.body;
 
-    if (!slot) {
-      return res.status(400).json({ message: "Slot not available" });
+    // Check if date is blocked
+    const blocked = await BlockedDate.findOne({ date });
+
+    if (blocked) {
+      return res.status(400).json({ message: "Date blocked by admin" });
     }
 
+    // Count bookings for that date
+    const bookingsCount = await Booking.countDocuments({ date });
+
+    // Get max booking limit
+    const config = await SiteConfig.findOne();
+    const maxBookings = config?.maxBookingsPerDay || 5;
+
+    if (bookingsCount >= maxBookings) {
+      return res.status(400).json({ message: "Date fully booked" });
+    }
 
     const options = {
-      amount: amount * 100, // in paise
+      amount: amount * 100,
       currency: "INR",
-      receipt: `receipt_${Date.now()}`,
+      receipt: `receipt_${Date.now()}`
     };
 
     const order = await razorpay.orders.create(options);
@@ -42,11 +52,13 @@ router.post("/create-order", async (req, res) => {
   }
 });
 
+
 // ----------------------
 // Verify Payment & Create Booking
 // ----------------------
 router.post("/verify-payment", async (req, res) => {
   try {
+
     const {
       razorpay_order_id,
       razorpay_payment_id,
@@ -55,20 +67,11 @@ router.post("/verify-payment", async (req, res) => {
       email,
       phone,
       date,
-      time,
       amount,
       imageUrl,
       address
     } = req.body;
 
-// console.log("---- VERIFY REQUEST RECEIVED ----");
-// console.log("Time:", time);
-// console.log("Date:", date);
-// console.log("Name:", name);
-// console.log("Email:", email);
-// console.log("Phone:", phone);
-    
-    // Generate expected signature
     const body = razorpay_order_id + "|" + razorpay_payment_id;
 
     const expectedSignature = crypto
@@ -76,49 +79,47 @@ router.post("/verify-payment", async (req, res) => {
       .update(body.toString())
       .digest("hex");
 
-      //for testing locally comment out signature verification
     if (expectedSignature !== razorpay_signature) {
       return res.status(400).json({ message: "Payment verification failed" });
     }
 
-    // Double-check slot availability (security check)
-    const slot = await Slot.findOne({ date, time, isBooked: false });
-    // console.log("Slot found:", slot);
+    // Check if date blocked
+    const blocked = await BlockedDate.findOne({ date });
 
-    //block dates check
-    if (slot.isBlocked) {
-      return res.status(400).json({ message: "Slot blocked by admin" });
+    if (blocked) {
+      return res.status(400).json({ message: "Date blocked by admin" });
     }
 
+    // Check booking count again (important security check)
+    const bookingsCount = await Booking.countDocuments({ date });
 
-    if (!slot) {
-      return res.status(400).json({ message: "Slot already booked" });
+    const config = await SiteConfig.findOne();
+    const maxBookings = config?.maxBookingsPerDay || 5;
+
+    if (bookingsCount >= maxBookings) {
+      return res.status(400).json({ message: "Date fully booked" });
     }
-    
+
     if (!name || !email || !phone || !address) {
-        return res.status(400).json({ message: "Customer details missing" });
+      return res.status(400).json({ message: "Customer details missing" });
     }
 
-    // Create booking only after payment verified
+    // Create booking
     const booking = await Booking.create({
       name,
       email,
       phone,
       date,
-      time,
       imageUrl,
       amount,
       paymentStatus: "paid",
       orderStatus: "pending",
-      address,
+      address
     });
 
-    // Lock slot
-    slot.isBooked = true;
-    await slot.save();
+    //brevo email notification continues here...
 
-    //brevo email notification
-    // console.log("🚀 About to send email...");
+
 
 try {
   const response = await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -180,7 +181,7 @@ try {
                 </tr>
                 <tr>
                   <td style="padding: 8px 0;"><strong>Time:</strong></td>
-                  <td>${time}</td>
+                  <td>${new Date().toLocaleString("en-IN")}</td>
                 </tr>
                 <tr>
                   <td style="padding: 8px 0;"><strong>Amount Paid:</strong></td>
@@ -254,7 +255,7 @@ try {
         <p><strong>Email:</strong> ${email}</p>
         <p><strong>Phone:</strong> ${phone}</p>
         <p><strong>Date:</strong> ${date}</p>
-        <p><strong>Time:</strong> ${time}</p>
+        <p><strong>Time:</strong> ${new Date().toLocaleString("en-IN")}</p>
         <p><strong>Amount:</strong> ₹${amount}</p>
       `,
     }),
@@ -279,14 +280,24 @@ try {
 
 
     res.json({
-      message: "Payment verified & booking confirmed",
-      booking,
+      success: true,
+      booking
     });
 
   } catch (error) {
-    // console.log("Hitting Catch Block:", error);
     res.status(500).json({ error: error.message });
   }
 });
+
+//     res.json({
+//       message: "Payment verified & booking confirmed",
+//       booking,
+//     });
+
+//   } catch (error) {
+//     // console.log("Hitting Catch Block:", error);
+//     res.status(500).json({ error: error.message });
+//   }
+// });
 
 module.exports = router;

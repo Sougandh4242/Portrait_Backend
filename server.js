@@ -5,7 +5,6 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 
 const connectDB = require("./config/db");
-const slotRoutes = require("./routes/slotRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
@@ -46,10 +45,10 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Public routes
-app.use("/api/slots", slotRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/bookings", bookingRoutes);
+// app.use("/api/unavailable-dates", bookingRoutes);
 // Gallery routes
 app.use("/api/gallery", galleryRoutes);
 

@@ -8,7 +8,7 @@ const upload = multer({ dest: "uploads/" });
 const cloudinary = require("../config/cloudinary");
 const Gallery = require("../models/Gallery");
 //dashboard stats
-const Slot = require("../models/Slot");
+// const Slot = require("../models/Slot");
 //blocked slots
 const BlockedDate = require("../models/BlockedDate");
 
@@ -182,33 +182,6 @@ router.put("/bookings/:id/status", adminAuth, async (req, res) => {
   }
 });
 
-router.put("/slots/:id/disable", adminAuth, async (req, res) => {
-  try {
-    const slot = await Slot.findByIdAndUpdate(
-      req.params.id,
-      { isAvailable: false },
-      { new: true }
-    );
-
-    res.json(slot);
-  } catch (error) {
-    res.status(500).json({ message: "Slot update failed" });
-  }
-});
-
-router.put("/slots/:id/enable", adminAuth, async (req, res) => {
-  try {
-    const slot = await Slot.findByIdAndUpdate(
-      req.params.id,
-      { isAvailable: true },
-      { new: true }
-    );
-
-    res.json(slot);
-  } catch (error) {
-    res.status(500).json({ message: "Slot update failed" });
-  }
-});
 
 // Block a date
 router.post("/block-date", adminAuth, async (req, res) => {
@@ -230,6 +203,27 @@ router.delete("/block-date/:date", adminAuth, async (req, res) => {
     res.json({ message: "Date unblocked" });
   } catch (error) {
     res.status(500).json({ message: "Unblock failed" });
+  }
+});
+
+//updating booking limit
+router.put("/booking-limit", adminAuth, async (req, res) => {
+  try {
+    const { maxBookingsPerDay } = req.body;
+
+    let config = await SiteConfig.findOne();
+
+    if (!config) {
+      config = await SiteConfig.create({ maxBookingsPerDay });
+    } else {
+      config.maxBookingsPerDay = maxBookingsPerDay;
+      await config.save();
+    }
+
+    res.json(config);
+
+  } catch (error) {
+    res.status(500).json({ message: "Update failed" });
   }
 });
 
@@ -262,6 +256,40 @@ router.put("/gallery/:id/featured", async (req, res) => {
   );
 
   res.json(updated);
+});
+
+router.get("/admin-date-stats", adminAuth, async (req, res) => {
+  try {
+
+    const config = await SiteConfig.findOne();
+    const maxBookings = config?.maxBookingsPerDay || 5;
+
+    const bookings = await Booking.aggregate([
+      {
+        $group: {
+          _id: "$date",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const blocked = await BlockedDate.find();
+
+    const stats = {};
+
+    bookings.forEach(b => {
+      stats[b._id] = { count: b.count, max: maxBookings };
+    });
+
+    blocked.forEach(b => {
+      stats[b.date] = { blocked: true };
+    });
+
+    res.json(stats);
+
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch stats" });
+  }
 });
 
 module.exports = router;
