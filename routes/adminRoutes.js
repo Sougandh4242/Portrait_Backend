@@ -11,6 +11,7 @@ const Gallery = require("../models/Gallery");
 // const Slot = require("../models/Slot");
 //blocked slots
 const BlockedDate = require("../models/BlockedDate");
+const SiteConfig = require("../models/SiteConfig");
 
 const router = express.Router();
 
