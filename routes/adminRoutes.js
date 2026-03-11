@@ -209,21 +209,20 @@ router.delete("/block-date/:date", adminAuth, async (req, res) => {
 //updating booking limit
 router.put("/booking-limit", adminAuth, async (req, res) => {
   try {
-    const { maxBookingsPerDay } = req.body;
 
-    let config = await SiteConfig.findOne();
+    const maxBookingsPerDay = Number(req.body.maxBookingsPerDay);
 
-    if (!config) {
-      config = await SiteConfig.create({ maxBookingsPerDay });
-    } else {
-      config.maxBookingsPerDay = maxBookingsPerDay;
-      await config.save();
-    }
+    const config = await SiteConfig.findOneAndUpdate(
+      {},
+      { maxBookingsPerDay },
+      { new: true, upsert: true }
+    );
 
     res.json(config);
 
   } catch (error) {
-    res.status(500).json({ message: "Update failed" });
+    console.error(error);
+    res.status(500).json({ message: "Update failed", error: error.message });
   }
 });
 
